@@ -245,7 +245,7 @@ def train_one_epoch(sess, ops, train_writer, epoch):
         train_writer.add_summary(summary, step)
         loss_sum += loss_val
 
-        if batch_idx % 50 == 0:
+        if batch_idx % 20 == 0:
             log_string(
                 "loss: {:.2f}; sem_loss: {:.2f}; cos_loss: {:.2f}; same_loss: {:.2f}; neq_loss: {:.2f};".format(
                     loss_val, sem_loss_val, cos_loss_val, same_loss_val, neq_loss_val))

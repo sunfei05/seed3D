@@ -393,8 +393,8 @@ def cosine_loss(prediction, ins_label, alpha=0.5):
     """
 
     # dis_mat
-    batch_size = prediction.shape()[0]
-    num_point = prediction.shape()[1]
+    batch_size = prediction.get_shape().as_list()[0]
+    num_point = prediction.get_shape().as_list()[1]
     prediction_norm = tf.sqrt(tf.reduce_sum(tf.square(prediction), axis=2))
     prediction_norm = tf.expand_dims(prediction_norm, axis=1)
     deno = tf.matmul(tf.transpose(prediction_norm, perm=[0, 2, 1]), prediction_norm)
@@ -403,24 +403,18 @@ def cosine_loss(prediction, ins_label, alpha=0.5):
     dis_mat = 0.5 * (1 + dis_mat)
 
     # same_mat
-    same_mat = tf.expand_dims(prediction, axis=-1) - tf.expand_dims(prediction, axis=1)
-    same_mat = tf.equal(same_mat, 0)
-    neq_mat = tf.not_equal(same_mat, 0)
+    sub_mat = tf.expand_dims(ins_label, axis=-1) - tf.expand_dims(ins_label, axis=1)
+    same_mat = tf.equal(sub_mat, 0)
+    neq_mat = tf.not_equal(sub_mat, 0)
 
     # weight_mat (B * N * N)
-    y, idx, count = tf.unique_with_counts(ins_label)
-    count_exp = tf.gather(count, idx)
-    weight_mat = tf.divide(1.0, count_exp)
-    weight_mat = tf.matmul(tf.expand_dims(weight_mat, axis=-1), tf.expand_dims(weight_mat, axis=1))
 
     # same_loss & neq_loss
     same_loss = 1 - dis_mat
     same_loss = tf.multiply(same_loss, tf.cast(same_mat, tf.float32))
-    same_loss = tf.multiply(same_loss, weight_mat)
     neq_loss = dis_mat - alpha
     neq_loss = tf.multiply(neq_loss, tf.cast(neq_mat, tf.float32))
     neq_loss = tf.clip_by_value(neq_loss, 0., neq_loss)
-    neq_loss = tf.multiply(neq_loss, weight_mat)
 
     # total_loss
     loss_mat = same_loss + neq_loss

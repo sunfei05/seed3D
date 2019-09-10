@@ -9,7 +9,7 @@ import numpy as np
 import tf_util
 from pointnet_util import pointnet_sa_module, pointnet_fp_module
 from loss import *
-
+from transform_nets import *
 
 def placeholder_inputs(batch_size, num_point):
     pointclouds_pl = tf.placeholder(tf.float32, shape=(batch_size, num_point, 9))
@@ -56,34 +56,36 @@ def get_model(point_cloud, is_training, num_class, bn_decay=None):
                              bn_decay=bn_decay)
     net_sem_cache = tf_util.conv1d(net_sem, 128, 1, padding='VALID', bn=True, is_training=is_training,
                                    scope='sem_cache', bn_decay=bn_decay)
+    net_ins_sem = net_sem_cache
+    net_ins_sem = tf.stop_gradient(net_ins_sem)
 
     # ins
 
     with tf.variable_scope('transform_net1') as sc:
-        transform = input_transform_net(point_cloud, is_training, bn_decay, K=3)
-    point_cloud_transformed = tf.matmul(point_cloud, transform)
+        transform = input_transform_net(l0_xyz, is_training, bn_decay, K=3)
+    point_cloud_transformed = tf.matmul(l0_xyz, transform)
     input_image = tf.expand_dims(point_cloud_transformed, -1)
 
     spatial_net = tf_util.conv2d(input_image, 64, [1, 3], padding='VALID', stride=[1,1],bn=True, is_training=is_training,
-                                scope='conv1', bn_decay=bn_decay)
+                                scope='spatial_net1', bn_decay=bn_decay)
     spatial_net = tf_util.conv2d(spatial_net, 64, [1,1],padding='VALID', stride=[1,1],bn=True, is_training=is_training,
-                                scope='conv2', bn_decay=bn_decay)
+                                scope='spatial_net2', bn_decay=bn_decay)
 
     with tf.variable_scope('transform_net2') as sc:
         transform = feature_transform_net(spatial_net, is_training, bn_decay, K=64)
     net_transformed = tf.matmul(tf.squeeze(spatial_net, axis=[2]), transform)
-    net_transformed = tf.expand_dims(net_transformed, [2])
 
-
-    net_ins = tf.concat([net_sem_cache, net_transformed], axis=3)
+    
+    net_ins = tf.concat([net_ins_sem, net_transformed], axis=2)
+    net_ins = tf.expand_dims(net_ins, axis=2)
     net_ins = tf_util.conv2d(net_ins, 192, [1, 1], padding='VALID', stride=[1,1], activation_fn=None, is_training=is_training,
                              scope='net_ins1', bn_decay=bn_decay)
     net_ins = tf_util.conv2d(net_ins, 128, [1, 1], padding='VALID', stride=[1, 1], activation_fn=None,
                              is_training=is_training,
-                             scope='net_ins1', bn_decay=bn_decay)
+                             scope='net_ins2', bn_decay=bn_decay)
     net_ins = tf_util.conv2d(net_ins, 128, [1, 1], padding='VALID', stride=[1, 1], activation_fn=None,
                              is_training=is_training,
-                             scope='net_ins2', bn_decay=bn_decay)
+                             scope='net_ins3', bn_decay=bn_decay)
     net_ins = tf.squeeze(net_ins, axis=2)
 
     k = 30
